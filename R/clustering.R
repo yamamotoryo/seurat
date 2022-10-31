@@ -1875,7 +1875,8 @@ my_FindMultiModalNeighbors  <- function(
 #
 #' @importFrom methods new
 #' @importClassesFrom SeuratObject Neighbor
-#
+#' @export
+#                     
 my_MultiModalNN <- function(
   object,
   query = NULL,
