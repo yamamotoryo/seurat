@@ -1877,20 +1877,21 @@ my_FindMultiModalNeighbors  <- function(
 #' @importClassesFrom SeuratObject Neighbor
 #' @export
 #                     
+
 my_MultiModalNN <- function(
-  object,
-  query = NULL,
-  modality.weight = NULL,
-  modality.weight.list = NULL,
-  k.nn = NULL,
-  reduction.list = NULL,
-  dims.list = NULL,
-  knn.range = 200,
-  kernel.power = 1,
-  nearest.dist = NULL,
-  sigma.list = NULL,
-  l2.norm =  NULL,
-  verbose = TRUE
+    object,
+    query = NULL,
+    modality.weight = NULL,
+    modality.weight.list = NULL,
+    k.nn = NULL,
+    reduction.list = NULL,
+    dims.list = NULL,
+    knn.range = 200,
+    kernel.power = 1,
+    nearest.dist = NULL,
+    sigma.list = NULL,
+    l2.norm =  NULL,
+    verbose = TRUE
 ){
   my.lapply <- ifelse(
     test = verbose,
@@ -1948,78 +1949,23 @@ my_MultiModalNN <- function(
   }
   query.cell.num <- nrow(x = query.reduction_embedding[[1]])
   reduction.num <- length(x = query.reduction_embedding)
-  if (verbose) {
-    message("Finding multimodal neighbors")
-  }
-  reduction_nn <- my.lapply(
-    X = 1:reduction.num,
-    FUN = function(x) {
-      nn_x <- NNHelper(
-        data = reduction_embedding[[x]],
-        query = query.reduction_embedding[[x]],
-        k = knn.range,
-        method = 'annoy',
-        metric = "euclidean"
-      )
-      return (nn_x)
-    }
-  )
-  # union of rna and adt nn, remove itself from neighobors
-  reduction_nn <- lapply(
-    X = reduction_nn,
-    FUN = function(x)  Indices(object = x)[, -1]
-  )
-  nn_idx <- lapply(
-    X = 1:query.cell.num ,
-    FUN = function(x) {
-      Reduce(
-        f = union,
-        x = lapply(
-          X = reduction_nn,
-          FUN = function(y) y[x, ]
-        )
-      )
-    }
-  )
-  # calculate euclidean distance of all neighbors
-  nn_dist <- my.lapply(
-    X = 1:reduction.num,
-    FUN = function(r) {
-      nndist <- NNdist(
-        nn.idx = nn_idx,
-        embeddings = reduction_embedding[[r]],
-        query.embeddings = query.reduction_embedding[[r]],
-        nearest.dist = nearest.dist[[r]]
-      )
-      return(nndist)
-    }
-  )
+  # calculate euclidean distance of all cells
+  Dist <- purrr::map(1:length(reduction.list),function(r){
+    reduction_embedding[[r]] %>% Rfast::Dist()  
+  })
   # modality weighted distance
   if (length(x = sigma.list[[1]]) == 1) {
     sigma.list <- lapply(X = sigma.list, FUN = function(x) rep(x = x, ncol(x = object)))
   }
-  nn_weighted_dist <- lapply(
-    X = 1:reduction.num,
-    FUN = function(r) {
-      lapply(
-        X = 1:query.cell.num,
-        FUN = function(x) {
-          exp(-1*(nn_dist[[r]][[x]] / sigma.list[[r]][x] ) ** kernel.power) * modality.weight.value[[r]][x]
-        }
-      )
-    }
-  )
-  nn_weighted_dist <- sapply(
-    X = 1:query.cell.num,
-    FUN =  function(x) {
-      Reduce(
-        f = "+",
-        x = lapply(
-          X = 1:reduction.num,
-          FUN = function(r) nn_weighted_dist[[r]][[x]]
-        )
-      )
-    }
-  )
-  return(nn_weighted_dist)
-}
+
+  weighted_dist <- purrr::map(1:reduction.num,function(r){
+    purrr::map(1:query.cell.num, function(x){
+      exp(-1*(Dist[[r]][x,] / sigma.list[[r]][x] ) ** kernel.power) * modality.weight.value[[r]][x]  
+    })
+  })
+  weighted_dist <- sapply(X = 1:query.cell.num, FUN = function(x) {
+    Reduce(f = "+", x = lapply(X = 1:reduction.num, FUN = function(r) weighted_dist[[r]][[x]]))
+  })
+  return(weighted_dist)
+}                     
+
