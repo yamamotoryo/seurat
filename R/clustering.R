@@ -1966,6 +1966,7 @@ my_MultiModalNN <- function(
   weighted_dist <- sapply(X = 1:query.cell.num, FUN = function(x) {
     Reduce(f = "+", x = lapply(X = 1:reduction.num, FUN = function(r) weighted_dist[[r]][[x]]))
   })
+  weighted_dist <- sqrt(x = MinMax(data = (1 - weighted_dist) / 2, min = 0, max = 1))
   return(weighted_dist)
 }                     
 
